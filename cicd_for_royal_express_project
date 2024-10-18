@@ -1,0 +1,52 @@
+pipeline {
+    agent any
+    
+
+    stages {
+        
+        stage('Git Clone') {
+            steps {
+                git credentialsId: 'royal_express', url: 'https://github.com/DevOps-Tushar-more/royal_express.git'
+            }
+        }
+        
+        stage('Build Docker Image') {
+            steps {
+                script {
+                     // Build Docker image
+                    sh "docker build -t tushar660/royal_express_p:${env.BUILD_NUMBER} ."
+                }
+            }
+        }
+        
+          
+            stage('Docker Login') {
+                steps {
+                    //loging docker hub 
+                  withCredentials([string(credentialsId: 'docker_hub', variable: 'docker_info')])  {
+                        script {
+                            // Login to Docker Hub using environment variables
+                          sh '''
+                            echo "$docker_info" | docker login -u tushar660 --password-stdin
+                        '''
+                        }
+                        sh "docker push tushar660/royal_express_p:${env.BUILD_NUMBER}"
+                    }
+                }
+            }
+                
+                 stage('Docker deploy application on server') {// Use the credentials configured in Jenkins
+                    steps{
+                         sshagent(['aws_id_password']){
+                              // Remove any old containers
+                            sh "ssh -o StrictHostKeyChecking=no ec2-user@65.2.122.61 sudo docker rm -f pratu || true"
+                             // Run the new container
+                            sh "ssh -o StrictHostKeyChecking=no ec2-user@65.2.122.61 sudo docker run -d --name pratu -p 8000:8000 tushar660/royal_express_p:${env.BUILD_NUMBER}"  
+                       }
+                    }
+                }
+                
+ 
+    }
+        
+}
